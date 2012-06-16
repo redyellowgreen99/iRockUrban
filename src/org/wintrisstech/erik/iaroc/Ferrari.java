@@ -3,8 +3,6 @@ package org.wintrisstech.erik.iaroc;
 import android.os.SystemClock;
 import ioio.lib.api.IOIO;
 import ioio.lib.api.exception.ConnectionLostException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.wintrisstech.irobot.ioio.IRobotCreateAdapter;
 import org.wintrisstech.irobot.ioio.IRobotCreateInterface;
 import org.wintrisstech.irobot.ioio.IRobotCreateScript;
@@ -48,7 +46,9 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
     /*
      * State variables:
      */
-    private int speed = 300; // The normal speed of the Ferrari when going straight
+    private int speed = 400; // The normal speed of the Ferrari when going straight
+    private int backwardsSpeed = 250;
+    private int spinSpeed = 250;// The normal speed of the Ferrari when going straight
     // The row and column number of the current cell. 
     private int row;
     private int column;
@@ -82,108 +82,37 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
      */
     public void run()
     {
+        dashboard.speak("Startup 2.0 . Hug factor 4. Climate Status Normal. Speed Factor is " + speed + "Take that! Oh! By the way, that's times two." + speed + "times two.");
         try
         {
             readSensors(SENSORS_GROUP_ID6);
             while (true)
             {
+//                goForward(speed);
+                goForward(speed);
                 readSensors(SENSORS_GROUP_ID6);
-                currentDistance = getDistance();
-                irCode = getInfraredByte();
-                totalDistance += currentDistance; // TODO: Check if the distance becomes negative while going backward
-                switch (mode)
+                totalDistance += getDistance();
+                if (totalDistance >= 50)
                 {
-                    case 0:
-                        goForward(defaultSpeed);
-                        forwardDistance += currentDistance;
-                        break;
-                    case 1:
-                        backUp(defaultSpeed);
-                        backwardDistance += currentDistance;
-                        break;
-                    case 2:
-                        backUp(defaultSpeed);
-                        backwardDistance += currentDistance;
-                        break;
-                    case 4:
-                        spinLeft(30, defaultSpeed);
-                        break;
-                    case 5:
-                        spinRight(30, defaultSpeed);
-                        break;
-                    case 6:
-                        spinLeft(15, defaultSpeed);
-                        break;
-                    case 7:
-                        spinRight(15, defaultSpeed);
-                        break;
-                    case 8:
-                        spinScan();
-                        break;
-
+                    totalDistance = 0;
+                    turnLeft(15, speed);
                 }
-
-                if (backwardDistance <= 0 && mode == 1)
-                {
-                    spinLeft(30, speed);
-                    mode = 0;
-                } else if (backwardDistance <= 0 && mode == 2)
-                {
-                    spinRight(30, speed);
-                    mode = 0;
-                }
-
                 readSensors(SENSORS_GROUP_ID6);
-                irCode = getInfraredByte();
-                //TODO: Probably we want to update totalDistance and backwardDistance as well
-                if (isBumpLeft() == true && isBumpRight() == false)
+                totalDistance += getDistance();
+                boolean bumpLeft = isBumpLeft();
+                boolean bumpRight = isBumpRight();
+                if (bumpLeft == true && bumpRight == false)
                 {
-                    dashboard.log("Bumped at left");
-                    mode = 2;
-                    backwardDistance = defaultBackwardDistance;
-                } else if (isBumpLeft() == false && isBumpRight() == true)
+                    goBackwards(1, backwardsSpeed);
+                    spinRight(10, spinSpeed);
+                } else if (bumpLeft == true && bumpRight == true)
                 {
-                    dashboard.log("Bumped at right");
-                    mode = 1;
-                    backwardDistance = defaultBackwardDistance;
-                } else if (isBumpLeft() == true && isBumpRight() == true)
+                    goBackwards(1, backwardsSpeed);
+                    spinRight(60, spinSpeed);
+                } else if (bumpLeft == false && bumpRight == true)
                 {
-                    mode = ((int) (Math.random() * 10) % 2) + 1;
-                    dashboard.log("Bumped at front, mode = " + mode);
-                    backwardDistance = defaultBackwardDistance;
-                }
-                if (totalDistance >= 250 && irCode == none && mode != 8)
-                {
-                    mode = 8;
-                    totalDistance = 0;
-                }
-                if (totalDistance >= 250 || mode == 8)
-                {
-                    dashboard.log("irCode = " + irCode);
-
-                    if (irCode == red)
-                    {
-                        mode = 4;
-                    } else if (irCode == green)
-                    {
-                        mode = 5;
-                    } else if (irCode == redAndGreen)
-                    {
-                        mode = 0;
-                    } else if (irCode == redAndForceField)
-                    {
-                        mode = 6;
-                    } else if (irCode == greenAndForceField)
-                    {
-                        mode = 7;
-                    } else if (irCode == RedAndGreenAndForceField)
-                    {
-                        mode = 0;
-                    } else
-                    {
-                        mode = 0;
-                    }
-                    totalDistance = 0;
+                    goBackwards(1, backwardsSpeed);
+                    spinLeft(65, spinSpeed);
                 }
             }
         } catch (Exception ex)
@@ -382,8 +311,10 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
      */
     public void spinScan() throws Exception
     {
+        dashboard.log("SPIN SCAN************************");
         int currentAngle = 0;
         readSensors(SENSORS_GROUP_ID6);
+        getInfraredByte();
         irCode = getInfraredByte();
         while (currentAngle <= 360 && irCode == none)
         {
@@ -391,6 +322,34 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
             currentAngle += getAngle();
             irCode = getInfraredByte();
             driveDirect(speed, -speed);
+            if (irCode == red)
+            {
+                dashboard.speak("Red");
+                mode = 4;
+            } else if (irCode == green)
+            {
+                dashboard.speak("Green");
+                mode = 5;
+            } else if (irCode == redAndGreen)
+            {
+                dashboard.speak("Red and Green");
+                mode = 0;
+            } else if (irCode == redAndForceField)
+            {
+                dashboard.speak("Red and Force Field");
+                mode = 6;
+            } else if (irCode == greenAndForceField)
+            {
+                dashboard.speak("Green and Force Field");
+                mode = 7;
+            } else if (irCode == RedAndGreenAndForceField)
+            {
+                dashboard.speak("Red, Green, and Force Field");
+                mode = 0;
+            } else
+            {
+                mode = 0;
+            }
         }
     }
 
@@ -401,9 +360,17 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
 //        checkingBumps(500);
     }
 
-    public void goBackwards(int speed) throws Exception
+    public void goBackwards(int distance, int speed) throws Exception
     {
-        driveDirect(-speed, -speed);
+        int currentDistance = 0;
+        readSensors(SENSORS_GROUP_ID6);
+        while (currentDistance > (-distance))
+        {
+            driveDirect(-speed, -speed);
+            readSensors(SENSORS_GROUP_ID6);
+            currentDistance += getDistance();
+        }
+        driveDirect(0, 0);
     }
 
 //    public void checkingBumps(int speed) throws Exception
@@ -428,6 +395,24 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
 //        }
 //    }
 
+    public void turnLeft(int angle, int speed) throws Exception
+    {
+        int currentAngle = 0;
+        while (currentAngle <= angle)
+        {
+            readSensors(SENSORS_GROUP_ID6);
+            currentAngle += getAngle();
+            driveDirect(speed, -speed / 16);
+        }
+        driveDirect(0, 0);
+    }
+
+    public void sensors(int angle, int speed) throws Exception
+    {
+        readSensors(SENSORS_GROUP_ID6);
+        readSensors(SENSORS_GROUP_ID6);
+    }
+
     public void spinLeft(int angle, int speed) throws Exception
     {
         int currentAngle = 0;
@@ -437,6 +422,19 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
             currentAngle += getAngle();
             driveDirect(speed, -speed);
         }
+        driveDirect(0, 0);
+    }
+
+    public void turnRight(int angle, int speed) throws Exception
+    {
+        int currentAngle = 0;
+        while (currentAngle >= (-angle))
+        {
+            readSensors(SENSORS_GROUP_ID6);
+            currentAngle += getAngle();
+            driveDirect(-speed / 16, speed);
+        }
+        driveDirect(0, 0);
     }
 
     public void spinRight(int angle, int speed) throws Exception
@@ -445,9 +443,12 @@ public class Ferrari extends IRobotCreateAdapter implements Runnable
         while (currentAngle >= (-angle))
         {
             readSensors(SENSORS_GROUP_ID6);
+        }
+        {
             currentAngle += getAngle();
             driveDirect(-speed, speed);
         }
+        driveDirect(0, 0);
     }
 
 //    public void bumpFront(int speed) throws Exception
