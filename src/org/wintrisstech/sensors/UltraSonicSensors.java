@@ -1,11 +1,11 @@
 package org.wintrisstech.sensors;
 
-import android.os.SystemClock;
 import ioio.lib.api.DigitalOutput;
 import ioio.lib.api.IOIO;
 import ioio.lib.api.PulseInput;
 import ioio.lib.api.PulseInput.PulseMode;
 import ioio.lib.api.exception.ConnectionLostException;
+import org.wintrisstech.erik.iaroc.Dashboard;
 
 /**
  * An UltraSonicSensors instance is used to access three ultrasonic sensors
@@ -13,8 +13,8 @@ import ioio.lib.api.exception.ConnectionLostException;
  *
  * @author Erik Colban
  */
-public class UltraSonicSensors
-{
+public class UltraSonicSensors {
+
     private static final String TAG = "UltraSonicSensor";
     private static final float CONVERSION_FACTOR = 17280.0F; //cm / s
     private static final int NUM_SAMPLES = 2;
@@ -27,8 +27,9 @@ public class UltraSonicSensors
     private final PulseInput right;
     private DigitalOutput strobe;
     private int leftDistance;
-    private int frontDistance = 10;
+    private int frontDistance;
     private int rightDistance;
+    private Dashboard dashboard;
 
     /**
      * Constructor of a UltraSonicSensors instance.
@@ -37,61 +38,44 @@ public class UltraSonicSensors
      * @throws ConnectionLostException
      *
      */
-    public UltraSonicSensors(IOIO ioio) throws ConnectionLostException
-    {
+    public UltraSonicSensors(IOIO ioio) throws ConnectionLostException {
         this.left = ioio.openPulseInput(LEFT_ULTRASONIC_INPUT_PIN, PulseMode.POSITIVE);
         this.front = ioio.openPulseInput(FRONT_ULTRASONIC_INPUT_PIN, PulseMode.POSITIVE);
         this.right = ioio.openPulseInput(RIGHT_ULTRASONIC_INPUT_PIN, PulseMode.POSITIVE);
         this.strobe = ioio.openDigitalOutput(STROBE_ULTRASONIC_OUTPUT_PIN);//*******
     }
 
-    /**
-     * Makes a reading of the ultrasonic sensors and stores the results locally.
-     * To access these readings, use {@link #getLeftDistance()},
-     * {@link #getFrontDistance()}, and {@link #getRightDistance()}.
-     *
-     * @throws ConnectionLostException
-     * @throws InterruptedException
-     */
-    public void readUltrasonicSensors() throws ConnectionLostException, InterruptedException
-    {
-        float leftAccumulated = 0.0F;
-        float frontAccumulated = 0.0F;
-        float rightAccumulated = 0.0F;
-        strobe.write(true);
-        for (int n = 0; n < NUM_SAMPLES; n++)
-        {
-            SystemClock.sleep(200);
-            leftAccumulated += left.getDuration(); // gets duration in seconds
-            frontAccumulated += front.getDuration();
-            rightAccumulated += right.getDuration();
-        }
-        synchronized (this)
-        {
-            leftDistance = Math.round(leftAccumulated * CONVERSION_FACTOR / NUM_SAMPLES);
-            frontDistance = Math.round(frontAccumulated * CONVERSION_FACTOR / NUM_SAMPLES);
-            rightDistance = Math.round(rightAccumulated * CONVERSION_FACTOR / NUM_SAMPLES);
-        }
-        strobe.write(false);
-    }
+    public void readUltrasonicSensors() throws ConnectionLostException, InterruptedException {
+//        float leftAccumulated = 0.0F;
+//        float frontAccumulated = 0.0F;
+//        float rightAccumulated = 0.0F;
+//        strobe.write(true);
+//        strobe.write(false);
+//        for (int n = 0; n < NUM_SAMPLES; n++) {
+//            SystemClock.sleep(200);
+//            leftAccumulated += left.getDuration(); // gets duration in seconds
+//            frontAccumulated += front.getDuration();
+//            rightAccumulated += right.getDuration();
+//        }
+//        synchronized (this) {
+//            leftDistance = Math.round(leftAccumulated * CONVERSION_FACTOR / NUM_SAMPLES);
+//            frontDistance = Math.round(frontAccumulated * CONVERSION_FACTOR / NUM_SAMPLES);
+//            rightDistance = Math.round(rightAccumulated * CONVERSION_FACTOR / NUM_SAMPLES);
+//        }
 
-    /**
-     * Test method to check the pulse emitted using an oscilloscope
-     *
-     * @throws ConnectionLostException
-     */
-    public void testStrobe() throws ConnectionLostException
-    {
-        for (int n = 0; n < NUM_SAMPLES; n++)
-        {
-            long end = System.nanoTime() + 5000; // 5  us from now 
-            strobe.write(true);
-            while (System.nanoTime() < end)
-            {
-            }
-            strobe.write(false);
-            SystemClock.sleep(100);
-        }
+
+        //dashboard.log("In read ultrasonic sensors");
+        strobe.write(true);
+        //dashboard.log("Strobe is true");
+        strobe.write(false);
+        //dashboard.log("Strobe is false");
+        rightDistance = (int) (right.getDuration() * 100000);
+        //dashboard.log("Finished reading right");
+        leftDistance = (int) (left.getDuration() * 100000);
+        //dashboard.log("Finished reading left");
+        frontDistance = (int) (front.getDuration() * 100000);
+        //dashboard.log("Finished reading front");
+        //dashboard.log("Finished reading ultrasonic sensors");
     }
 
     /**
@@ -99,8 +83,7 @@ public class UltraSonicSensors
      *
      * @return the left distance in cm
      */
-    public synchronized int getLeftDistance()
-    {
+    public synchronized int getLeftDistance() {
         return leftDistance;
     }
 
@@ -109,8 +92,7 @@ public class UltraSonicSensors
      *
      * @return the front distance in cm
      */
-    public synchronized int getFrontDistance()
-    {
+    public synchronized int getFrontDistance() {
         return frontDistance;
     }
 
@@ -119,19 +101,24 @@ public class UltraSonicSensors
      *
      * @return the right distance in cm
      */
-    public synchronized int getRightDistance()
-    {
+    public synchronized int getRightDistance() {
         return rightDistance;
     }
 
     /**
      * Closes all the connections to the used pins
      */
-    public void closeConnection()
-    {
+    public void closeConnection() {
         left.close();
         front.close();
         right.close();
         strobe.close();
+    }
+
+    /**
+     * @param dashboard the dashboard to set
+     */
+    public void setDashboard(Dashboard dashboard) {
+        this.dashboard = dashboard;
     }
 }
